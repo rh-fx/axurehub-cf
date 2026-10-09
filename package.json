@@ -6,7 +6,8 @@
   "type": "module",
   "scripts": {
     "dev": "wrangler dev",
-    "deploy": "wrangler deploy",
+    "gen:config": "node scripts/generate-wrangler-config.js",
+    "deploy": "npm run gen:config && wrangler deploy -c wrangler.generated.json",
     "tail": "wrangler tail",
     "kv:create": "wrangler kv namespace create AXUREHUB_KV",
     "r2:create": "wrangler r2 bucket create axurehub-protos",

@@ -27,8 +27,10 @@ run_worker_first = true
 
 [[kv_namespaces]]
 binding = "KV"
-# 部署前替换为真实 id（npm run kv:create 会输出；一键部署会自动写入）
-id = "REPLACE_WITH_KV_NAMESPACE_ID"
+# 本地 wrangler dev 用，id 可为占位串（本地不校验）。
+# 线上部署走 npm run deploy：由 KV_NAMESPACE_ID / D1_DATABASE_ID 环境变量
+# 生成 wrangler.generated.json，真实 id 不进仓库。
+id = "LOCAL_DEV_KV_PLACEHOLDER"
 
 [[r2_buckets]]
 binding = "BUCKET"
@@ -37,8 +39,7 @@ bucket_name = "axurehub-protos"
 [[d1_databases]]
 binding = "DB"
 database_name = "axurehub-db"
-# 可选：不需要 D1 时整段删除即可（程序会自动回退到 KV）
-database_id = "REPLACE_WITH_D1_DATABASE_ID"
+database_id = "LOCAL_DEV_D1_PLACEHOLDER"
 
 [vars]
 # 分片大小上限（字节）。Cloudflare Worker 请求体有大小限制，默认 4MB 一片最稳妥。
