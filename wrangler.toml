@@ -1,35 +1,50 @@
 # ---------------------------------------------------------------------------
-# AxureHub on Cloudflare Pages
+# AxureHub on Cloudflare Workers
 #
 # 绑定说明：
-#   KV     -> 元数据存储（原型 / 版本 / 链接 / 设置）。未绑定 D1 时作为唯一存储后端。
-#   BUCKET -> R2，存放原型全部静态文件（分片写入，按需流式读取）
-#   DB     -> D1 (SQLite)，可选。绑定后自动建表并优先使用；不绑定则回退到 KV。
+#   KV      -> 元数据存储（原型 / 版本 / 链接 / 设置）。未绑定 D1 时作为唯一存储后端。
+#   BUCKET  -> R2，存放原型全部静态文件（分片写入，按需流式读取）
+#   DB      -> D1 (SQLite)，可选。绑定后自动建表并优先使用；不绑定则回退到 KV。
+#   ASSETS  -> 静态资源绑定（public/ 目录），由 Worker 主动 fetch
 #
-# 部署方式 A（推荐，Dashboard）：在 Pages 项目 Settings -> Functions 中绑定 KV/R2/D1，
-#   并在 Settings -> Environment variables 中设置 SITE_PASSWORD / ADMIN_PASSWORD。
-# 部署方式 B（wrangler.toml）：填写下面的 id，然后 `npm run deploy`。
+# 一键部署（README 顶部按钮）：Cloudflare 会读取本文件自动开通 KV / R2 / D1，
+#   并把真实的 namespace id / database id 写回到这里，无需手工填写。
+# 手动部署：先执行 npm run kv:create / r2:create / d1:create，把返回的 id 填入下方
+#   对应位置，再 npm run deploy。
+#
+# ⚠️ Git 连接部署（Workers Builds）同样要求下面的 id 是真实值：
+#   云端会真正执行 `npx wrangler deploy`，占位串会导致部署失败。
 # ---------------------------------------------------------------------------
 name = "axurehub"
-compatibility_date = "2024-09-01"
-pages_build_output_dir = "public"
+main = "src/index.js"
+compatibility_date = "2026-10-09"
 
-# [[kv_namespaces]]
-# binding = "KV"
-# id = "在这里填写 KV namespace id"
+[assets]
+directory = "./public"
+binding = "ASSETS"
+# 全站访问密码校验需要拦在静态资源之前，因此让 Worker 先跑
+run_worker_first = true
 
-# [[r2_buckets]]
-# binding = "BUCKET"
-# bucket_name = "axurehub-protos"
-# preview_bucket_name = "axurehub-protos-preview"
+[[kv_namespaces]]
+binding = "KV"
+# 部署前替换为真实 id（npm run kv:create 会输出；一键部署会自动写入）
+id = "REPLACE_WITH_KV_NAMESPACE_ID"
 
-# [[d1_databases]]
-# binding = "DB"
-# database_name = "axurehub-db"
-# database_id = "在这里填写 D1 database id"
+[[r2_buckets]]
+binding = "BUCKET"
+bucket_name = "axurehub-protos"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "axurehub-db"
+# 可选：不需要 D1 时整段删除即可（程序会自动回退到 KV）
+database_id = "REPLACE_WITH_D1_DATABASE_ID"
 
 [vars]
 # 分片大小上限（字节）。Cloudflare Worker 请求体有大小限制，默认 4MB 一片最稳妥。
 SHARD_SIZE = "4194304"
 # 会话有效期（秒），默认 7 天
 SESSION_TTL = "604800"
+
+# 密码不要写在这里：用 npm run secret:site / secret:admin 写入，
+# 或在一键部署流程里按 .dev.vars.example 的提示填写（会存为加密 Secret）。

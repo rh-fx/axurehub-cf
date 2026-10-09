@@ -1,4 +1,6 @@
-# 本地开发密钥（复制为 .dev.vars，该文件不会被提交）
+# 密钥模板：本地开发复制为 .dev.vars；一键部署（Deploy to Cloudflare 按钮）时
+# Cloudflare 会按这个文件里的键名在部署页面提示填写，并保存为加密 Secret。
+#
 # 全站访问密码：留空则无需密码即可浏览
 SITE_PASSWORD=letmein
 # 管理员密码：用于上传 / 删除 / 修改等写操作

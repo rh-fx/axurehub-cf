@@ -1,22 +1,36 @@
 {
   "name": "axurehub-cf",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "private": true,
-  "description": "基于 Cloudflare Pages + Functions + KV + R2 + D1(SQLite) 的 Axure 原型私有托管方案",
+  "description": "基于 Cloudflare Workers + Static Assets + KV + R2 + D1(SQLite) 的 Axure 原型私有托管方案",
   "type": "module",
   "scripts": {
-    "dev": "wrangler pages dev public --compatibility-date=2024-09-01 --kv=KV --r2=BUCKET --d1=DB",
-    "dev:kv": "wrangler pages dev public --compatibility-date=2024-09-01 --kv=KV --r2=BUCKET",
-    "deploy": "wrangler pages deploy public --project-name=axurehub",
-    "d1:create": "wrangler d1 create axurehub-db",
-    "d1:schema": "wrangler d1 execute axurehub-db --file=./schema.sql",
-    "d1:schema:local": "wrangler d1 execute axurehub-db --local --file=./schema.sql",
-    "kv:create": "wrangler kv:namespace create AXUREHUB_KV",
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy",
+    "tail": "wrangler tail",
+    "kv:create": "wrangler kv namespace create AXUREHUB_KV",
     "r2:create": "wrangler r2 bucket create axurehub-protos",
-    "secret:site": "wrangler pages secret put SITE_PASSWORD --project-name=axurehub",
-    "secret:admin": "wrangler pages secret put ADMIN_PASSWORD --project-name=axurehub"
+    "d1:create": "wrangler d1 create axurehub-db",
+    "d1:schema": "wrangler d1 execute axurehub-db --remote --file=./schema.sql",
+    "d1:schema:local": "wrangler d1 execute axurehub-db --local --file=./schema.sql",
+    "secret:site": "wrangler secret put SITE_PASSWORD",
+    "secret:admin": "wrangler secret put ADMIN_PASSWORD",
+    "secret:session": "wrangler secret put SESSION_SECRET"
+  },
+  "cloudflare": {
+    "bindings": {
+      "SITE_PASSWORD": {
+        "description": "全站访问密码。留空则无需密码即可浏览；设置后所有页面 / API / 原型文件都需登录。"
+      },
+      "ADMIN_PASSWORD": {
+        "description": "管理员密码，与访问密码独立。上传 / 删除 / 版本管理 / 链接管理 / 设置等写操作均需它。建议用 `openssl rand -hex 16` 生成。"
+      },
+      "SESSION_SECRET": {
+        "description": "可选。会话 Cookie 的 HMAC 签名密钥，默认由上面两个密码派生；修改它会让所有已登录会话失效。建议用 `openssl rand -hex 32` 生成。"
+      }
+    }
   },
   "devDependencies": {
-    "wrangler": "^3.60.0"
+    "wrangler": "^4.149.0"
   }
 }

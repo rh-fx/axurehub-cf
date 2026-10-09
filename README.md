@@ -1,8 +1,12 @@
 # AxureHub on Cloudflare
 
+[![Deploy to Cloudflare](https://deploy.workers.cloudflare.com/button)](https://deploy.workers.cloudflare.com/?url=https://github.com/rh-fx/axurehub-cf)
+
 > 免费、高效、可私有化部署的 Axure 原型托管方案 —— 替代停服的 Axure Cloud（Axure RP 8 及更早版本无法直接发布原型）。
 
-基于 **Cloudflare Pages + Functions + KV + R2 + D1(SQLite)** 构建：**零服务器、零运维，全部跑在 Cloudflare 免费额度内**，也可以整套搬到你自己的账号里私有部署。
+基于 **Cloudflare Workers + Static Assets + KV + R2 + D1(SQLite)** 构建：**零服务器、零运维，全部跑在 Cloudflare 免费额度内**，也可以整套搬到你自己的账号里私有部署。
+
+点上面的按钮即可一键部署到你自己的 Cloudflare 账号（KV / R2 / D1 会自动开通并绑定），详见 [四、部署](#四部署)。
 
 ---
 
@@ -13,7 +17,7 @@
 | Axure RP 8 / 更早版本无法发布到 Axure Cloud | 本地导出 HTML 文件夹，直接上传到自己的站点 |
 | 官方托管不私有、不可控、有费用 | 部署在你自己的 Cloudflare 账号下，数据全部在你自己的 R2 / KV / D1 里 |
 | 自建静态托管无法管理版本、无法搜索 | 内置版本管理 + 毫秒级全站实时搜索 + 外部链接导航 |
-| Worker / Pages Functions 有请求体大小限制，大原型传不上去 | 浏览器端**路径剥离 + 分包并发上传**，单片默认 4 MB，理论上无总大小上限 |
+| Worker 对单个请求体有大小限制，大原型传不上去 | 浏览器端**路径剥离 + 分包并发上传**，单片默认 4 MB，理论上无总大小上限 |
 
 ---
 
@@ -23,19 +27,22 @@
 浏览器（无构建步骤，原生 ES Module）
    │  ① 选择 Axure 导出文件夹 → 剥离外层路径 → 打包成分片 → 4 路并发上传
    ▼
-Cloudflare Pages Functions
+Cloudflare Worker（src/index.js，assets.run_worker_first = true）
    ├─ _middleware.js     全站访问密码（HMAC 签名 Cookie 会话）
    ├─ api/[[path]].js    REST API（原型 / 版本 / 链接 / 上传 / 设置 / 搜索索引）
    ├─ p/[[path]].js      /p/<slug>/…   原型静态文件托管（R2 流式回源）
-   └─ s/[[path]].js      /s/<slug>     单文件 HTML 原型托管
+   ├─ s/[[path]].js      /s/<slug>     单文件 HTML 原型托管
+   └─ ASSETS 绑定        public/ 下的静态资源（index.html / login.html / assets/*）
    │
    ├─ KV       元数据存储（未绑定 D1 时的默认后端）
    ├─ D1       SQLite 结构化存储（可选，绑定后自动建表并优先使用）
    └─ R2       原型全部静态文件（分片写入，按需按 parts 顺序流式读取）
 ```
 
+* **Worker 入口**：`src/index.js` 只做适配层，把 Worker 的 `fetch(request, env, ctx)` 包装成 Pages Functions 风格的 `context`，从而原样复用 `functions/` 下的全部业务代码（中间件 → 路由分发 → 静态资源回退）。
+* **为什么 `run_worker_first = true`**：首页与全部 API 都要经过访问密码校验，若让静态资源先命中就会绕过登录，因此所有请求统一先进入 Worker。
 * **后端双存储**：绑定 D1 时使用 SQLite（`prototypes` / `versions` / `links` / `settings` 四张表）；不绑定则自动回退到 KV（单键 JSON 文档）。两套后端接口完全一致，零配置也能跑。
-* **前端无构建**：原生 HTML + ES Module，Pages 直接托管，不需要 npm build。
+* **前端无构建**：原生 HTML + ES Module，随 Worker 一起作为 Static Assets 上传，不需要 npm build。
 
 ---
 
@@ -94,48 +101,98 @@ Cloudflare Pages Functions
 
 ## 四、部署
 
-### 0. 准备
+### 0. 一键部署（推荐）
+
+[![Deploy to Cloudflare](https://deploy.workers.cloudflare.com/button)](https://deploy.workers.cloudflare.com/?url=https://github.com/rh-fx/axurehub-cf)
+
+点击按钮后依次完成：
+
+1. Cloudflare 把本仓库 fork / clone 到你的 GitHub / GitLab 账号（因此仓库需为 public）；
+2. 填写 Worker 名称、KV namespace 名、R2 bucket 名、D1 数据库名；
+3. 按 `.dev.vars.example` 的键名填写 `SITE_PASSWORD` / `ADMIN_PASSWORD` / `SESSION_SECRET`（会保存为加密 Secret）；
+4. Cloudflare **自动开通 KV / R2 / D1 并把真实 id 写回 `wrangler.toml`**，然后用 Workers Builds 完成构建与部署。
+
+部署完成后访问 `https://<worker名>.<账号>.workers.dev` 即可。后续每次 `git push` 到该仓库都会自动重新部署。
+
+> 说明：Cloudflare 已停止新建 Pages 项目，官方「Deploy to Cloudflare」按钮只支持 Workers 应用，
+> 因此本项目已从 Pages Functions 迁移到 **Workers + Static Assets**（业务代码零改动，见 `src/index.js`）。
+
+### 1. 从 GitHub 连接部署（Workers Builds）
+
+> **关键：要创建的是 Workers 项目，不是 Pages 项目。**
+> 在 Pages 项目里跑 `npx wrangler deploy` 会被直接拒绝，报
+> `It looks like you've run a Workers-specific command in a Pages project`。
+
+1. **Workers & Pages** → **Create** → 选择从 Git 导入 → 选中本仓库；
+2. Cloudflare 读取仓库根的 `wrangler.toml`，项目类型自动识别为 **Workers**；
+3. 构建配置按下表填写（其余保持默认）：
+
+   | 字段 | 值 |
+   | --- | --- |
+   | 构建命令 Build command | 留空（前端无构建步骤，也可填 `exit 0`） |
+   | 部署命令 Deploy command | `npx wrangler deploy`（默认值，**保留**；不要改成 `wrangler pages deploy`） |
+   | 根目录 Root directory | `/` |
+
+4. **部署前必须**把 `wrangler.toml` 里的 `id`（KV）和 `database_id`（D1）换成真实值
+   （用下面 `kv:create` / `d1:create` 的输出），占位串会导致 `wrangler deploy` 失败；
+5. 在 Worker → **Settings** → **Variables and Secrets** 中添加 `SITE_PASSWORD` / `ADMIN_PASSWORD` / `SESSION_SECRET`。
+
+之后每次 `git push` 都会自动触发重新部署。之前建错的 Pages 项目建议直接删除，避免混淆。
+
+### 2. 手动部署（wrangler）
+
 ```bash
-npm i            # 只需 wrangler
+npm i                  # 只装 wrangler
 npx wrangler login
+
+npm run r2:create      # 创建 R2 bucket（bucket_name 已固定为 axurehub-protos）
+npm run kv:create      # 输出 namespace id
+npm run d1:create      # 输出 database_id（可选，不用 D1 可跳过）
+# 把上面两个 id 填进 wrangler.toml 的 id / database_id
+
+npm run secret:site    # wrangler secret put SITE_PASSWORD
+npm run secret:admin   # wrangler secret put ADMIN_PASSWORD
+
+npm run deploy         # wrangler deploy
 ```
 
-### 1. 创建资源
-```bash
-npm run r2:create     # wrangler r2 bucket create axurehub-protos
-npm run kv:create     # wrangler kv:namespace create AXUREHUB_KV
-npm run d1:create     # wrangler d1 create axurehub-db   （可选）
-```
+若不想用 D1：删除 `wrangler.toml` 里 `[[d1_databases]]` 整段即可，程序会自动回退到 KV 存储。
 
-### 2. 绑定
-**方式 A（推荐）**：在 Cloudflare Dashboard → Workers & Pages → 你的 Pages 项目 →
-Settings → Functions 中添加 KV / R2 / D1 绑定，绑定名分别为 **`KV`**、**`BUCKET`**、**`DB`**；
-在 Settings → Environment variables 中设置 `SITE_PASSWORD`、`ADMIN_PASSWORD`（建议用 *Encrypt* 类型）。
+### 3. 绑定一览
 
-**方式 B**：把 `wrangler.toml` 中对应段落的注释打开并填入 id，然后用 `npm run deploy` 部署（绑定随配置生效）。
+| 绑定名 | 类型 | 必需 | 说明 |
+| --- | --- | --- | --- |
+| `KV` | KV namespace | 是（未用 D1 时） | 元数据存储；绑定名不能改 |
+| `BUCKET` | R2 bucket | 是 | 原型静态文件；绑定名不能改 |
+| `DB` | D1 database | 否 | 绑定后自动建表并优先使用，不绑定则用 KV |
+| `ASSETS` | Static Assets | 是 | 由 `wrangler.toml` 的 `[assets]` 自动生成，指向 `public/` |
 
-### 3. 设置密钥
-```bash
-npm run secret:site    # wrangler pages secret put SITE_PASSWORD
-npm run secret:admin   # wrangler pages secret put ADMIN_PASSWORD
-```
-两个都不设置 = 完全开放（适合内网/自用）；强烈建议至少设置 `ADMIN_PASSWORD`。
+### 4. 环境变量与密钥
 
-### 4. 部署
-```bash
-npm run deploy         # wrangler pages deploy public --project-name=axurehub
-```
-也可直接连接 Git 仓库，让 Pages 自动构建（无需构建命令，输出目录填 `public`）。
+| 名称 | 类型 | 默认值 | 说明 |
+| --- | --- | --- | --- |
+| `SITE_PASSWORD` | Secret | 空 | 全站访问密码。留空 = 无需登录即可浏览 |
+| `ADMIN_PASSWORD` | Secret | 空 | 管理员密码（写操作）。留空 = 任何人可写，**强烈建议设置** |
+| `SESSION_SECRET` | Secret | 由上面两个密码派生 | 会话 Cookie 的 HMAC 签名密钥，改它会让所有会话失效 |
+| `SHARD_SIZE` | var | `4194304` | 单片大小（字节），4 MB |
+| `SESSION_TTL` | var | `604800` | 会话有效期（秒），7 天 |
+
+* Secret 用 `npm run secret:*` 写入，或在 Dashboard → Worker → Settings → Variables and Secrets 中添加；
+* 明文 var 直接写在 `wrangler.toml` 的 `[vars]` 里；
+* 本地开发用 `.dev.vars`（`cp .dev.vars.example .dev.vars`，该文件不会被提交）。
 
 ### 5. 本地开发
+
 ```bash
 npm i
 cp .dev.vars.example .dev.vars     # 填写本地密码
-npm run dev                        # KV + R2 + D1 全绑定
-npm run dev:kv                     # 只用 KV + R2（不启用 D1）
+npm run dev                        # http://localhost:8788
 npm run d1:schema:local            # 本地 D1 建表（可选，程序也会自动建）
+npm run tail                       # 查看线上日志
 ```
-> 本地 `wrangler pages dev` 会把 R2 / KV / D1 模拟在 `.wrangler/state` 下，全部资源均为「[simulated locally]」，不需要联网、不会产生费用。
+
+> `wrangler dev` 会把 R2 / KV / D1 全部模拟在 `.wrangler/state` 下（日志显示 `[wrangler:info] ... simulated locally` 之类），不联网、不产生费用。
+> 想连线上数据：`npx wrangler dev --remote`。
 
 **WSL / Windows 混合环境注意**
 如果你在 WSL 里开发，但 `npm` 实际指向 Windows 的 Node（例如 `which npm` 显示 `/mnt/d/.../npm`），
@@ -146,7 +203,7 @@ npm run d1:schema:local            # 本地 D1 建表（可选，程序也会自
 export PATH="/root/.workbuddy/binaries/node/versions/22.12.0/bin:$PATH"   # 或你自己的 nvm / apt 安装的 node
 node -v && npm run dev
 ```
-（`wrangler pages dev` 必须在 Linux Node 下运行）；或者在 Windows PowerShell 中、以 `C:\...` 之类的本地路径打开项目再执行 `npm run dev`。
+（`wrangler dev` 必须在 Linux Node 下运行）；或者在 Windows PowerShell 中、以 `C:\...` 之类的本地路径打开项目再执行 `npm run dev`。
 
 ---
 
@@ -168,7 +225,9 @@ node -v && npm run dev
 
 ```
 .
-├── functions/
+├── src/
+│   └── index.js                    Worker 入口：中间件 → 路由分发 → ASSETS 回退
+├── functions/                      业务代码（原 Pages Functions，签名不变，被 Worker 复用）
 │   ├── _middleware.js              全站访问密码中间件
 │   ├── _lib/
 │   │   ├── auth.js                 会话签名、双密码校验、管理员判定
@@ -179,7 +238,7 @@ node -v && npm run dev
 │   ├── api/[[path]].js             REST API 总路由
 │   ├── p/[[path]].js               /p/<slug>/… 原型静态托管
 │   └── s/[[path]].js               /s/<slug> 单文件原型托管
-├── public/
+├── public/                         Static Assets（[assets].directory）
 │   ├── index.html                  首页 + 管理端（hash 路由）
 │   ├── login.html                  登录页（中间件放行）
 │   └── assets/
@@ -190,7 +249,8 @@ node -v && npm run dev
 │       ├── uploader.js             路径剥离、分包打包、并发上传、页面解析
 │       └── app.js                  入口与路由
 ├── schema.sql                      D1 表结构
-├── wrangler.toml
+├── wrangler.toml                   Worker / 静态资源 / KV / R2 / D1 绑定 / vars
+├── .dev.vars.example               密钥模板（本地 .dev.vars + 一键部署填写项）
 └── package.json
 ```
 
@@ -223,7 +283,7 @@ node -v && npm run dev
 
 ## 八、设计与性能说明
 
-* **上传为什么能突破大小限制**：Cloudflare Worker/Pages Functions 对**单个请求体**有上限。
+* **上传为什么能突破大小限制**：Cloudflare Worker 对**单个请求体**有上限。
   方案把请求体控制在单片 ≤ 4 MB，并在服务端把片内字节直接切片写入 R2，
   既绕开了请求体上限，又不产生内存峰值（无 base64、无整体解压）。
 * **为什么分包而不是「一文件一片」**：Axure 导出常含数百个几 KB 的小文件，
