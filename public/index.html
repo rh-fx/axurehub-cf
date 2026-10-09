@@ -1,0 +1,186 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>AxureHub · 原型托管</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E%F0%9F%A7%A9%3C/text%3E%3C/svg%3E">
+  <link rel="stylesheet" href="/assets/style.css">
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand"><span class="logo">🧩</span> AxureHub</div>
+    <div class="search-wrap">
+      <input id="search-input" type="search" placeholder="搜索原型、页面、链接…" autocomplete="off" spellcheck="false">
+      <span class="kbd">Ctrl K</span>
+    </div>
+    <div class="actions">
+      <button class="btn" id="btn-admin">⚙️ 管理</button>
+      <button class="btn ghost" id="btn-logout">退出</button>
+    </div>
+  </header>
+
+  <main>
+    <div id="banner" class="banner hidden"></div>
+
+    <!-- ============================ 首页 ============================ -->
+    <section id="view-home">
+      <div id="search-panel" class="hidden">
+        <div class="search-stat" id="search-stat"></div>
+        <div class="results" id="search-results"></div>
+      </div>
+
+      <div id="home-panel">
+        <div class="section-head">
+          <h2>原型</h2>
+          <span class="spacer"></span>
+          <select id="proto-sort">
+            <option value="updated">最近更新</option>
+            <option value="created">最近创建</option>
+            <option value="name">名称 A→Z</option>
+            <option value="custom">自定义顺序</option>
+          </select>
+        </div>
+        <div class="grid" id="proto-grid"></div>
+
+        <div class="section-head">
+          <h2>外部链接</h2>
+          <span class="spacer"></span>
+          <select id="link-sort">
+            <option value="custom">自定义顺序</option>
+            <option value="name">名称 A→Z</option>
+            <option value="created">最近添加</option>
+          </select>
+        </div>
+        <div class="links" id="link-list"></div>
+      </div>
+    </section>
+
+    <!-- ============================ 管理端 ============================ -->
+    <section id="view-admin" class="hidden">
+      <div class="tabs" id="admin-tabs">
+        <div class="tab active" data-tab="upload">⬆️ 上传</div>
+        <div class="tab" data-tab="protos">🗂️ 原型与版本</div>
+        <div class="tab" data-tab="links">🔗 链接管理</div>
+        <div class="tab" data-tab="settings">🔐 设置</div>
+      </div>
+
+      <!-- 上传 -->
+      <div id="tab-upload" class="panel">
+        <h3>上传原型</h3>
+        <div class="tabs" id="mode-tabs" style="border: none; margin-bottom: 10px">
+          <div class="tab active" data-mode="folder">📁 完整文件夹（Axure 导出）</div>
+          <div class="tab" data-mode="single">📄 单个 HTML 文件</div>
+        </div>
+
+        <div id="mode-folder">
+          <div class="dropzone" id="folder-dz">
+            <div style="font-size: 26px">📁</div>
+            <div>点击选择文件夹，或把 Axure 导出的整个文件夹拖进来</div>
+            <div class="small">浏览器端自动剥离外层路径、分包并发上传，并识别根目录 index.html</div>
+          </div>
+          <input type="file" id="folder-input" webkitdirectory directory multiple class="hidden">
+          <div class="file-summary" id="folder-summary"></div>
+        </div>
+
+        <div id="mode-single" class="hidden">
+          <div class="dropzone" id="single-dz">
+            <div style="font-size: 26px">📄</div>
+            <div>点击选择单个 HTML 文件，或拖到此处</div>
+          </div>
+          <input type="file" id="single-input" accept=".html,.htm" class="hidden">
+          <div class="file-summary" id="single-summary"></div>
+        </div>
+
+        <div class="row" style="margin-top: 14px">
+          <div class="field">
+            <label>原型名称</label>
+            <input id="f-name" placeholder="例如：电商 App 高保真原型">
+          </div>
+          <div class="field">
+            <label>访问标识 slug（留空自动生成）</label>
+            <input id="f-slug" placeholder="例如：shop-app">
+          </div>
+        </div>
+        <div class="row">
+          <div class="field">
+            <label>描述 / 标签（参与搜索）</label>
+            <input id="f-desc" placeholder="例如：v2 改版 电商 移动端">
+          </div>
+          <div class="field">
+            <label>版本说明</label>
+            <input id="f-note" placeholder="例如：首页改版">
+          </div>
+        </div>
+        <div class="field">
+          <label>图标 Emoji</label>
+          <div style="display: flex; gap: 12px; align-items: flex-start; flex-wrap: wrap">
+            <input id="f-emoji" value="🧩" style="width: 72px">
+            <div id="f-emoji-picker"></div>
+          </div>
+        </div>
+        <div class="field">
+          <label>更新已有原型（可选，选择后作为新版本上传）</label>
+          <select id="f-proto"></select>
+        </div>
+
+        <div style="display: flex; gap: 10px; align-items: center; margin-top: 6px; flex-wrap: wrap">
+          <button class="btn primary" id="btn-upload">开始上传</button>
+          <button class="btn" id="btn-clear-files">清空已选文件</button>
+        </div>
+        <div class="progress hidden" id="up-progress"><i></i></div>
+        <div class="progress-text hidden" id="up-text"></div>
+      </div>
+
+      <!-- 原型与版本 -->
+      <div id="tab-protos" class="panel hidden">
+        <h3>原型与版本</h3>
+        <div id="protos-table"></div>
+      </div>
+
+      <!-- 链接 -->
+      <div id="tab-links" class="panel hidden">
+        <h3>新增外部链接</h3>
+        <div class="row">
+          <div class="field"><label>名称</label><input id="l-name" placeholder="例如：需求文档"></div>
+          <div class="field"><label>地址</label><input id="l-url" placeholder="https://…"></div>
+        </div>
+        <div class="row">
+          <div class="field"><label>描述 / 标签</label><input id="l-desc"></div>
+          <div class="field"><label>图标 Emoji</label><input id="l-emoji" value="🔗" style="width: 72px"></div>
+        </div>
+        <div id="l-emoji-picker" style="margin-bottom: 10px"></div>
+        <button class="btn primary" id="btn-add-link">添加链接</button>
+
+        <h3 style="margin-top: 24px">链接列表（可调整顺序）</h3>
+        <div id="links-table"></div>
+      </div>
+
+      <!-- 设置 -->
+      <div id="tab-settings" class="panel hidden">
+        <h3>安全设置</h3>
+        <p class="small muted">
+          环境变量 <span class="mono">SITE_PASSWORD</span> / <span class="mono">ADMIN_PASSWORD</span>
+          的优先级高于此处保存的值；若已在环境变量中配置，下面的修改不会生效。
+        </p>
+        <div class="row">
+          <div class="field">
+            <label>全站访问密码（留空 = 不启用密码）</label>
+            <input id="s-site" type="password" autocomplete="new-password">
+          </div>
+          <div class="field">
+            <label>管理员密码（留空 = 不启用管理密码）</label>
+            <input id="s-admin" type="password" autocomplete="new-password">
+          </div>
+        </div>
+        <button class="btn primary" id="btn-save-settings">保存</button>
+
+        <h3 style="margin-top: 24px">运行信息</h3>
+        <div id="runtime-info" class="small mono"></div>
+      </div>
+    </section>
+  </main>
+
+  <script type="module" src="/assets/app.js"></script>
+</body>
+</html>

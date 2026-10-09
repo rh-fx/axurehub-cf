@@ -1,0 +1,7 @@
+# 本地开发密钥（复制为 .dev.vars，该文件不会被提交）
+# 全站访问密码：留空则无需密码即可浏览
+SITE_PASSWORD=letmein
+# 管理员密码：用于上传 / 删除 / 修改等写操作
+ADMIN_PASSWORD=admin123
+# 会话签名密钥（可选，默认由上面两个密码派生）
+SESSION_SECRET=please-change-me

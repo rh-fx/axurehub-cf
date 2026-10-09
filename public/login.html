@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>登录 · AxureHub</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E%F0%9F%A7%A9%3C/text%3E%3C/svg%3E">
+  <link rel="stylesheet" href="/assets/style.css">
+</head>
+<body class="login-page">
+  <form class="login-card" id="login-form" autocomplete="on">
+    <h1>🧩 AxureHub</h1>
+    <p class="sub">请输入访问密码</p>
+    <div class="field">
+      <label>密码</label>
+      <input type="password" id="pw" name="password" autocomplete="current-password" placeholder="全站访问密码 / 管理员密码" required autofocus>
+    </div>
+    <div id="err" class="small" style="color: var(--danger); min-height: 18px"></div>
+    <button class="btn primary" type="submit" id="submit">进入</button>
+    <p class="small muted" style="margin-top: 16px">
+      使用<strong>管理员密码</strong>登录可直接获得上传与管理权限；<br>
+      使用<strong>全站访问密码</strong>登录仅可浏览原型。
+    </p>
+  </form>
+
+  <script type="module">
+    const form = document.getElementById('login-form');
+    const pw = document.getElementById('pw');
+    const err = document.getElementById('err');
+    const submit = document.getElementById('submit');
+    const next = new URLSearchParams(location.search).get('next') || '/';
+
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      err.textContent = '';
+      submit.disabled = true;
+      submit.textContent = '验证中…';
+      try {
+        const res = await fetch('/api/auth/login', {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ password: pw.value }),
+        });
+        const data = await res.json();
+        if (!res.ok || !data.ok) throw new Error(data.error || '登录失败');
+        location.href = next;
+      } catch (e2) {
+        err.textContent = e2.message || '登录失败';
+        submit.disabled = false;
+        submit.textContent = '进入';
+        pw.select();
+      }
+    });
+  </script>
+</body>
+</html>

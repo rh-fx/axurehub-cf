@@ -1,0 +1,35 @@
+# ---------------------------------------------------------------------------
+# AxureHub on Cloudflare Pages
+#
+# 绑定说明：
+#   KV     -> 元数据存储（原型 / 版本 / 链接 / 设置）。未绑定 D1 时作为唯一存储后端。
+#   BUCKET -> R2，存放原型全部静态文件（分片写入，按需流式读取）
+#   DB     -> D1 (SQLite)，可选。绑定后自动建表并优先使用；不绑定则回退到 KV。
+#
+# 部署方式 A（推荐，Dashboard）：在 Pages 项目 Settings -> Functions 中绑定 KV/R2/D1，
+#   并在 Settings -> Environment variables 中设置 SITE_PASSWORD / ADMIN_PASSWORD。
+# 部署方式 B（wrangler.toml）：填写下面的 id，然后 `npm run deploy`。
+# ---------------------------------------------------------------------------
+name = "axurehub"
+compatibility_date = "2024-09-01"
+pages_build_output_dir = "public"
+
+# [[kv_namespaces]]
+# binding = "KV"
+# id = "在这里填写 KV namespace id"
+
+# [[r2_buckets]]
+# binding = "BUCKET"
+# bucket_name = "axurehub-protos"
+# preview_bucket_name = "axurehub-protos-preview"
+
+# [[d1_databases]]
+# binding = "DB"
+# database_name = "axurehub-db"
+# database_id = "在这里填写 D1 database id"
+
+[vars]
+# 分片大小上限（字节）。Cloudflare Worker 请求体有大小限制，默认 4MB 一片最稳妥。
+SHARD_SIZE = "4194304"
+# 会话有效期（秒），默认 7 天
+SESSION_TTL = "604800"

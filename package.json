@@ -1,0 +1,22 @@
+{
+  "name": "axurehub-cf",
+  "version": "1.0.0",
+  "private": true,
+  "description": "基于 Cloudflare Pages + Functions + KV + R2 + D1(SQLite) 的 Axure 原型私有托管方案",
+  "type": "module",
+  "scripts": {
+    "dev": "wrangler pages dev public --compatibility-date=2024-09-01 --kv=KV --r2=BUCKET --d1=DB",
+    "dev:kv": "wrangler pages dev public --compatibility-date=2024-09-01 --kv=KV --r2=BUCKET",
+    "deploy": "wrangler pages deploy public --project-name=axurehub",
+    "d1:create": "wrangler d1 create axurehub-db",
+    "d1:schema": "wrangler d1 execute axurehub-db --file=./schema.sql",
+    "d1:schema:local": "wrangler d1 execute axurehub-db --local --file=./schema.sql",
+    "kv:create": "wrangler kv:namespace create AXUREHUB_KV",
+    "r2:create": "wrangler r2 bucket create axurehub-protos",
+    "secret:site": "wrangler pages secret put SITE_PASSWORD --project-name=axurehub",
+    "secret:admin": "wrangler pages secret put ADMIN_PASSWORD --project-name=axurehub"
+  },
+  "devDependencies": {
+    "wrangler": "^3.60.0"
+  }
+}
